@@ -1,6 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import { fade, fly } from "svelte/transition";
+    import { fade, fly, scale } from "svelte/transition";
 
     let authCode = $state("");
     let token = $state("");
