@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import { fade, fly } from "svelte/transition";
 
     let authCode = $state("");
     let token = $state("");
@@ -34,6 +35,7 @@
                             // @ts-ignore
                             my.alert({
                                 content: "Login successful",
+                                buttonText: "Continue",
                             });
                             currentStep = "scan";
                         })
@@ -46,7 +48,7 @@
                             }
                             // @ts-ignore
                             my.alert({
-                                content: "Error: " + errorDetails,
+                                content: "Login Error: " + errorDetails,
                             });
                         });
                 },
@@ -55,10 +57,12 @@
                 },
             });
         } else {
-            // Fallback for browser testing without Hylid
-            alert("Hylid environment not found. Mocking login success.");
-            currentStep = "scan";
-            token = "mock-token";
+            // Fallback for browser testing
+            // Using a slight delay to feel more natural
+            setTimeout(() => {
+                currentStep = "scan";
+                token = "mock-token";
+            }, 800);
         }
     }
 
@@ -70,21 +74,23 @@
                 type: "qr",
                 success: (/** @type {{ code: any; }} */ res) => {
                     parkingSpot = res.code;
-                    // @ts-ignore
-                    my.alert({ title: "Scanned: " + res.code });
                     currentStep = "details";
+                    // @ts-ignore
+                    my.alert({ title: "Found Spot: " + res.code });
                 },
             });
         } else {
             // Fallback for browser testing
-            let mockCode = prompt(
-                "Enter mock QR code (e.g., SPOT-123):",
-                "SPOT-123",
-            );
-            if (mockCode) {
-                parkingSpot = mockCode;
-                currentStep = "details";
-            }
+            setTimeout(() => {
+                let mockCode = prompt(
+                    "Simulate QR Scan (Enter Spot ID):",
+                    "ZONE-A-01",
+                );
+                if (mockCode) {
+                    parkingSpot = mockCode;
+                    currentStep = "details";
+                }
+            }, 500);
         }
     }
 
@@ -104,24 +110,25 @@
                     my.tradePay({
                         paymentUrl: data.url,
                         success: (/** @type {any} */ res) => {
+                            currentStep = "paid";
                             // @ts-ignore
                             my.alert({
                                 content: "Payment successful",
                             });
-                            currentStep = "paid";
                         },
                     });
                 })
                 .catch((err) => {
                     // @ts-ignore
                     my.alert({
-                        content: "Payment failed",
+                        content: "Payment failed. Please try again.",
                     });
                 });
         } else {
             // Fallback for browser testing
-            alert(`Simulating Payment of ${totalCost} IQD`);
-            currentStep = "paid";
+            setTimeout(() => {
+                currentStep = "paid";
+            }, 1500);
         }
     }
 
@@ -132,134 +139,254 @@
         authCode = "";
         token = "";
     }
-
-    function copyAuthCode() {
-        if (authCode) {
-            navigator.clipboard.writeText(authCode);
-            alert("Auth code copied!");
-        } else {
-            alert("No auth code available yet.");
-        }
-    }
 </script>
 
-<div
-    class="h-16 w-full bg-stone-700 flex items-center justify-start px-4 fixed top-0 left-0 z-10"
->
-    <h1 class="text-2xl font-bold text-white">Parking MiniApp</h1>
-</div>
-
-<div
-    class="w-full h-screen flex flex-col items-center gap-6 justify-start p-4 mt-16"
->
-    <!-- Step 1: Login -->
-    {#if currentStep === "login"}
-        <div class="flex flex-col items-center gap-4 w-full max-w-sm">
-            <h2 class="text-xl font-semibold">Welcome</h2>
-            <p class="text-gray-600 text-center">
-                Please log in to start parking.
-            </p>
-            <button
-                class="bg-blue-500 text-white px-6 py-3 rounded-xl w-full font-medium shadow-lg active:scale-95 transition-all cursor-pointer"
-                onclick={authenticate}
-            >
-                Login with SuperQi
-            </button>
-        </div>
-    {/if}
-
-    <!-- Step 2: Scan -->
-    {#if currentStep === "scan"}
-        <div class="flex flex-col items-center gap-4 w-full max-w-sm">
-            <h2 class="text-xl font-semibold">Scan Parking Spot</h2>
-            <p class="text-gray-600 text-center">
-                Scan the QR code at your parking spot.
-            </p>
-            <button
-                class="bg-blue-500 text-white px-6 py-3 rounded-xl w-full font-medium shadow-lg active:scale-95 transition-all cursor-pointer"
-                onclick={scan}
-            >
-                Scan QR Code
-            </button>
-            {#if authCode}
-                <button
-                    class="text-sm text-gray-400 underline"
-                    onclick={copyAuthCode}>Copy Debug Auth Code</button
-                >
-            {/if}
-        </div>
-    {/if}
-
-    <!-- Step 3: Details & Pay -->
-    {#if currentStep === "details"}
-        <div class="flex flex-col items-center gap-4 w-full max-w-sm">
-            <h2 class="text-xl font-semibold">Parking Details</h2>
-
-            <div class="bg-gray-100 p-4 rounded-lg w-full">
-                <p class="text-sm text-gray-500">Spot ID</p>
-                <p class="text-lg font-bold">{parkingSpot}</p>
-            </div>
-
-            <div class="w-full">
-                <label class="block text-sm text-gray-500 mb-1" for="hours"
-                    >Duration (Hours)</label
-                >
-                <input
-                    id="hours"
-                    type="number"
-                    min="1"
-                    bind:value={parkingHours}
-                    class="w-full p-3 border border-gray-300 rounded-lg text-lg text-center"
-                />
-            </div>
-
-            <div class="flex justify-between w-full items-center p-2">
-                <span class="text-gray-600">Rate</span>
-                <span class="font-medium">1,000 IQD / hr</span>
-            </div>
-
-            <div class="w-full border-t border-gray-200 my-2"></div>
-
-            <div class="flex justify-between w-full items-center">
-                <span class="text-xl font-bold">Total</span>
-                <span class="text-xl font-bold text-blue-600"
-                    >{totalCost.toLocaleString()} IQD</span
-                >
-            </div>
-
-            <button
-                class="bg-green-500 text-white px-6 py-3 rounded-xl w-full font-medium shadow-lg active:scale-95 transition-all mt-4 cursor-pointer"
-                onclick={pay}
-            >
-                Pay Now
-            </button>
-        </div>
-    {/if}
-
-    <!-- Step 4: Success -->
-    {#if currentStep === "paid"}
-        <div
-            class="flex flex-col items-center gap-4 w-full max-w-sm text-center"
+<div class="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
+    <!-- Header -->
+    <header
+        class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 px-6 py-4 flex items-center justify-center shadow-sm"
+    >
+        <h1
+            class="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"
         >
-            <div
-                class="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-3xl mb-2"
-            >
-                ✓
-            </div>
-            <h2 class="text-2xl font-bold text-green-600">
-                Payment Successful!
-            </h2>
-            <p class="text-gray-600">
-                You have paid <b>{totalCost.toLocaleString()} IQD</b> for
-                <b>{parkingHours} hours</b>.
-            </p>
+            SmartParking
+        </h1>
+    </header>
 
-            <button
-                class="bg-gray-800 text-white px-6 py-3 rounded-xl w-full font-medium shadow-lg active:scale-95 transition-all mt-8 cursor-pointer"
-                onclick={reset}
+    <!-- Main Content -->
+    <main
+        class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto"
+    >
+        <!-- Step 1: Login -->
+        {#if currentStep === "login"}
+            <div
+                in:fly={{ y: 20, duration: 400 }}
+                class="flex flex-col items-center gap-6 w-full text-center"
             >
-                Done
-            </button>
-        </div>
-    {/if}
+                <div
+                    class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mb-2"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-10 w-10"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+                        />
+                    </svg>
+                </div>
+                <div class="space-y-2">
+                    <h2 class="text-2xl font-bold text-slate-900">
+                        Welcome Back
+                    </h2>
+                    <p class="text-slate-500 text-sm leading-relaxed">
+                        Login with your SuperQi account to easy park and pay.
+                    </p>
+                </div>
+
+                <button
+                    class="w-full bg-blue-600 text-white font-semibold py-4 rounded-2xl shadow-lg shadow-blue-600/20 active:scale-[0.98] transition-all hover:bg-blue-700 mt-4 cursor-pointer"
+                    onclick={authenticate}
+                >
+                    Login with SuperQi
+                </button>
+            </div>
+        {/if}
+
+        <!-- Step 2: Scan -->
+        {#if currentStep === "scan"}
+            <div
+                in:fly={{ y: 20, duration: 400 }}
+                class="flex flex-col items-center gap-6 w-full text-center"
+            >
+                <div
+                    class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-2 animate-pulse"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-10 w-10"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                        />
+                    </svg>
+                </div>
+                <div class="space-y-2">
+                    <h2 class="text-2xl font-bold text-slate-900">
+                        Find Your Spot
+                    </h2>
+                    <p class="text-slate-500 text-sm leading-relaxed">
+                        Locate the QR code on your parking pillar and scan it.
+                    </p>
+                </div>
+
+                <button
+                    class="w-full bg-indigo-600 text-white font-semibold py-4 rounded-2xl shadow-lg shadow-indigo-600/20 active:scale-[0.98] transition-all hover:bg-indigo-700 mt-4 cursor-pointer"
+                    onclick={scan}
+                >
+                    Scan QR Code
+                </button>
+            </div>
+        {/if}
+
+        <!-- Step 3: Details & Pay -->
+        {#if currentStep === "details"}
+            <div
+                in:fly={{ y: 20, duration: 400 }}
+                class="flex flex-col gap-6 w-full"
+            >
+                <div class="text-center space-y-1">
+                    <h2 class="text-2xl font-bold text-slate-900">
+                        Confirm Parking
+                    </h2>
+                    <p class="text-slate-500 text-sm">
+                        Review details before payment
+                    </p>
+                </div>
+
+                <div
+                    class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col gap-4"
+                >
+                    <div
+                        class="flex items-center justify-between p-3 bg-slate-50 rounded-xl"
+                    >
+                        <span class="text-slate-500 text-sm font-medium"
+                            >Spot ID</span
+                        >
+                        <span class="text-slate-900 font-bold tracking-wide"
+                            >{parkingSpot}</span
+                        >
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <label
+                            class="text-slate-500 text-sm font-medium ml-1"
+                            for="hours">Duration</label
+                        >
+                        <div class="relative">
+                            <input
+                                id="hours"
+                                type="number"
+                                min="1"
+                                max="24"
+                                bind:value={parkingHours}
+                                class="w-full p-4 bg-slate-50 border-none rounded-2xl text-lg font-bold text-center focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                            />
+                            <span
+                                class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium pointer-events-none"
+                                >Hours</span
+                            >
+                        </div>
+                    </div>
+
+                    <div
+                        class="py-4 border-t border-dashed border-slate-200 mt-2 space-y-3"
+                    >
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-slate-500">Rate</span>
+                            <span class="font-medium text-slate-700"
+                                >1,000 IQD / hr</span
+                            >
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-900 font-bold text-lg"
+                                >Total Cost</span
+                            >
+                            <span class="text-2xl font-black text-blue-600"
+                                >{totalCost.toLocaleString()}
+                                <span class="text-sm font-bold text-blue-400"
+                                    >IQD</span
+                                ></span
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <button
+                    class="w-full bg-green-600 text-white font-semibold py-4 rounded-2xl shadow-lg shadow-green-600/20 active:scale-[0.98] transition-all hover:bg-green-700 cursor-pointer"
+                    onclick={pay}
+                >
+                    Pay & Park
+                </button>
+            </div>
+        {/if}
+
+        <!-- Step 4: Success -->
+        {#if currentStep === "paid"}
+            <div
+                in:scale={{ duration: 400, start: 0.9 }}
+                class="flex flex-col items-center gap-6 w-full text-center max-w-sm"
+            >
+                <div
+                    class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center text-green-500 mb-2 shadow-sm"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-12 w-12"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="3"
+                            d="M5 13l4 4L19 7"
+                        />
+                    </svg>
+                </div>
+                <div class="space-y-3">
+                    <h2 class="text-3xl font-bold text-slate-900">Success!</h2>
+                    <p class="text-slate-500 text-sm leading-relaxed">
+                        Your parking has been confirmed.
+                    </p>
+                </div>
+
+                <div
+                    class="bg-slate-50 rounded-2xl p-6 w-full mt-2 border border-slate-100"
+                >
+                    <div class="flex justify-between mb-2">
+                        <span class="text-slate-400 text-sm">Amount Paid</span>
+                        <span class="font-bold text-slate-700"
+                            >{totalCost.toLocaleString()} IQD</span
+                        >
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400 text-sm">Duration</span>
+                        <span class="font-bold text-slate-700"
+                            >{parkingHours} Hours</span
+                        >
+                    </div>
+                </div>
+
+                <button
+                    class="w-full bg-slate-900 text-white font-medium py-3 rounded-xl shadow-lg shadow-slate-900/10 active:scale-[0.98] transition-all hover:bg-slate-800 mt-6 cursor-pointer"
+                    onclick={reset}
+                >
+                    Back to Home
+                </button>
+            </div>
+        {/if}
+    </main>
 </div>
+
+<style>
+    /* Custom utility overrides if needed, though Tailwind covers most */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+</style>
